@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 use rkyv::ser::serializers::{BufferSerializer, BufferScratch, CompositeSerializer};
 use rkyv::ser::Serializer;
 use rkyv::Infallible;
-use aya::maps::HashMap as BpfHashMap;
+use aya::maps::{HashMap as BpfHashMap, PerCpuHashMap as BpfPerCpuHashMap};
 use mizn_common::bpf::{FlowKey, FlowMetrics};
 use mizn_common::ipc::{IpcProcessMetrics, IpcState};
 use rusqlite::Connection;
@@ -53,10 +53,20 @@ pub async fn run(mut args: CoreLoopArgs) {
 
         let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
 
-        if let Ok(flow_map) = BpfHashMap::<_, FlowKey, FlowMetrics>::try_from(args.bpf.map_mut("FLOW_METRICS").unwrap()) {
+        if let Ok(flow_map) = BpfPerCpuHashMap::<_, FlowKey, FlowMetrics>::try_from(args.bpf.map_mut("FLOW_METRICS").unwrap()) {
             let mut updates = Vec::new();
             for r in flow_map.iter().filter_map(|r| r.ok()) {
-                let (key, metrics) = r;
+                let (key, per_cpu_metrics) = r;
+                let mut metrics = FlowMetrics::default();
+                for m in per_cpu_metrics.iter() {
+                    metrics.bytes += m.bytes;
+                    metrics.packets += m.packets;
+                    metrics.tcp_flags |= m.tcp_flags;
+                    if metrics.sni[0] == 0 && m.sni[0] != 0 {
+                        metrics.sni = m.sni;
+                    }
+                }
+
                 let prev        = bpf_shadow.entry(key).or_default();
                 let delta_bytes = metrics.bytes.wrapping_sub(prev.bytes);
                 if delta_bytes > 0 {

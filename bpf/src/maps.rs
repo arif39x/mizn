@@ -1,9 +1,9 @@
 use aya_ebpf::macros::map;
-use aya_ebpf::maps::HashMap;
+use aya_ebpf::maps::{HashMap, PerCpuHashMap};
 use mizn_common::bpf::{FlowKey, FlowMetrics};
 
 #[map]
-pub static FLOW_METRICS: HashMap<FlowKey, FlowMetrics> = HashMap::with_max_entries(10240, 0);
+pub static FLOW_METRICS: PerCpuHashMap<FlowKey, FlowMetrics> = PerCpuHashMap::with_max_entries(10240, 0);
 
 #[map]
 pub static BLOCKLIST: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);

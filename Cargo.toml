@@ -3,9 +3,8 @@ members = [
     "lib",
     "daemon",
     "tui",
-    "tools",
 ]
-exclude = ["bpf"]
+exclude = ["bpf", "tools"]
 resolver = "2"
 
 [profile.dev]
