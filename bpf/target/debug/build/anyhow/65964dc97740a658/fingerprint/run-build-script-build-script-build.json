@@ -1,0 +1,1 @@
+{"rustc":12284691325317620644,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[12478428894219133322,"build_script_build",false,11772602734374034829]],"local":[{"RerunIfChanged":{"output":"debug/build/anyhow/65964dc97740a658/run/stdout","paths":["src/nightly.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}

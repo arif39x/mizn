@@ -9,8 +9,8 @@ use crate::parsing::{make_flow_key, ptr_at, PROTO_TCP, PROTO_UDP, ETH_IPV4, ETH_
 pub struct TransportArgs {
     pub xport_off: usize,
     pub protocol: u8,
-    pub src_ip: u32,
-    pub dst_ip: u32,
+    pub src_ip: [u8; 16],
+    pub dst_ip: [u8; 16],
     pub pkt_len: u64,
 }
 
@@ -27,33 +27,37 @@ unsafe fn dispatch_flat(ctx: &XdpContext, ip_off: usize, etype: u16) -> Result<u
     match etype {
         ETH_IPV4 => {
             let ip: *const Ipv4Header = ptr_at(ctx, ip_off)?;
-            if BLOCKLIST.get(&(*ip).source_address).is_some() {
+            if BLOCKLIST.get(&(*ip).source_address).is_some()
+                || BLOCKLIST.get(&(*ip).destination_address).is_some()
+            {
                 return Ok(xdp_action::XDP_DROP);
             }
             let proto   = (*ip).protocol;
             let ihl     = (((*ip).version_ihl & 0x0F) as usize) << 2;
             let xoff    = ip_off + ihl;
             let pkt_len = (ctx.data_end() - ctx.data()) as u64;
-            process_transport_flat(ctx, xoff, proto, (*ip).source_address, (*ip).destination_address, pkt_len)
+            let src_ip  = crate::parsing::ipv4_to_v6_mapped((*ip).source_address);
+            let dst_ip  = crate::parsing::ipv4_to_v6_mapped((*ip).destination_address);
+            process_transport_flat(ctx, xoff, proto, src_ip, dst_ip, pkt_len)
         }
         ETH_IPV6 => {
             let ip6: *const Ipv6Header = ptr_at(ctx, ip_off)?;
-            if BLOCKLIST_V6.get(&(*ip6).source_address).is_some() {
+            if BLOCKLIST_V6.get(&(*ip6).source_address).is_some()
+                || BLOCKLIST_V6.get(&(*ip6).destination_address).is_some()
+            {
                 return Ok(xdp_action::XDP_DROP);
             }
             let proto   = (*ip6).next_header;
             let xoff    = ip_off + mem::size_of::<Ipv6Header>();
             let pkt_len = (ctx.data_end() - ctx.data()) as u64;
-            let src_lo  = u32::from_be_bytes([(*ip6).source_address[12], (*ip6).source_address[13], (*ip6).source_address[14], (*ip6).source_address[15]]);
-            let dst_lo  = u32::from_be_bytes([(*ip6).destination_address[12], (*ip6).destination_address[13], (*ip6).destination_address[14], (*ip6).destination_address[15]]);
-            process_transport_flat(ctx, xoff, proto, src_lo, dst_lo, pkt_len)
+            process_transport_flat(ctx, xoff, proto, (*ip6).source_address, (*ip6).destination_address, pkt_len)
         }
         _ => Ok(xdp_action::XDP_PASS),
     }
 }
 
 #[inline(always)]
-unsafe fn process_transport_flat(ctx: &XdpContext, xoff: usize, proto: u8, src_ip: u32, dst_ip: u32, pkt_len: u64) -> Result<u32, ()> {
+unsafe fn process_transport_flat(ctx: &XdpContext, xoff: usize, proto: u8, src_ip: [u8; 16], dst_ip: [u8; 16], pkt_len: u64) -> Result<u32, ()> {
     if proto != PROTO_TCP && proto != PROTO_UDP { return Ok(xdp_action::XDP_PASS); }
     let (sp, dp, payload_off, flags) = if proto == PROTO_TCP {
         let tcp: *const TcpHeader = ptr_at(ctx, xoff)?;

@@ -4,8 +4,8 @@ use bytemuck::{Pod, Zeroable};
 #[derive(Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 #[cfg_attr(feature = "std", derive(Debug, Hash))]
 pub struct FlowKey {
-    pub source_ip: u32,
-    pub destination_ip: u32,
+    pub source_ip: [u8; 16],
+    pub destination_ip: [u8; 16],
     pub source_port: u16,
     pub destination_port: u16,
     pub protocol: u8,

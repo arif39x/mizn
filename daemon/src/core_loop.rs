@@ -85,8 +85,13 @@ pub async fn run(mut args: CoreLoopArgs) {
                         
                         let entry = global_state.active_process_telemetry.entry(pid).or_insert_with(|| IpcProcessMetrics::new(pid, name));
                         entry.update_from_delta(delta_bytes, is_tx, &metrics);
-                        if is_tx { entry.last_resolved_remote_peer_ipv4 = Some(key.destination_ip); } 
-                        else { entry.last_resolved_remote_peer_ipv4 = Some(key.source_ip); }
+                        let remote_ip = if is_tx { key.destination_ip } else { key.source_ip };
+                        let remote_ipv4 = if remote_ip[0..12] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff] {
+                            Some(u32::from_be_bytes([remote_ip[12], remote_ip[13], remote_ip[14], remote_ip[15]]))
+                        } else {
+                            None
+                        };
+                        entry.last_resolved_remote_peer_ipv4 = remote_ipv4;
                         if !sni.is_empty() { entry.sni = sni; }
 
                         dtx += delta_bytes * (is_tx as u64);

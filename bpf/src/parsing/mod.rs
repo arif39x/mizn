@@ -23,23 +23,31 @@ pub const PORT_HTTP:    u16 = 80;
 
 #[inline(always)]
 pub unsafe fn make_flow_key(
-    source_ip: u32,
-    destination_ip: u32,
+    source_ip: [u8; 16],
+    destination_ip: [u8; 16],
     source_port: u16,
     destination_port: u16,
     protocol: u8,
 ) -> mizn_common::bpf::FlowKey {
     let mut value = core::mem::MaybeUninit::<mizn_common::bpf::FlowKey>::uninit();
     let ptr = value.as_mut_ptr();
-    (*ptr).source_ip = source_ip;
-    (*ptr).destination_ip = destination_ip;
-    (*ptr).source_port = source_port;
-    (*ptr).destination_port = destination_port;
-    (*ptr).protocol = protocol;
-    (*ptr)._alignment_padding[0] = 0;
-    (*ptr)._alignment_padding[1] = 0;
-    (*ptr)._alignment_padding[2] = 0;
-    value.assume_init()
+    unsafe {
+        (*ptr).source_ip = source_ip;
+        (*ptr).destination_ip = destination_ip;
+        (*ptr).source_port = source_port;
+        (*ptr).destination_port = destination_port;
+        (*ptr).protocol = protocol;
+        (*ptr)._alignment_padding[0] = 0;
+        (*ptr)._alignment_padding[1] = 0;
+        (*ptr)._alignment_padding[2] = 0;
+        value.assume_init()
+    }
+}
+
+#[inline(always)]
+pub fn ipv4_to_v6_mapped(ip: u32) -> [u8; 16] {
+    let b = ip.to_be_bytes();
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, b[0], b[1], b[2], b[3]]
 }
 
 #[inline(always)]

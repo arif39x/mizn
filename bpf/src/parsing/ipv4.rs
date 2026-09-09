@@ -22,8 +22,8 @@ pub unsafe fn parse_ipv4(ctx: &XdpContext, ip_offset: usize, depth: u8) -> Resul
     let protocol    = (*ip).protocol;
     let ihl         = (((*ip).version_ihl & 0x0F) as usize) << 2;
     let xport_off   = ip_offset + ihl;
-    let src_ip      = (*ip).source_address;
-    let dst_ip      = (*ip).destination_address;
+    let src_ip      = crate::parsing::ipv4_to_v6_mapped((*ip).source_address);
+    let dst_ip      = crate::parsing::ipv4_to_v6_mapped((*ip).destination_address);
     let pkt_len     = (ctx.data_end() - ctx.data()) as u64;
 
     match protocol {

@@ -24,22 +24,16 @@ pub unsafe fn parse_ipv6(ctx: &XdpContext, ip_offset: usize, depth: u8) -> Resul
     let xport   = ip_offset + mem::size_of::<Ipv6Header>();
     let pkt_len = (ctx.data_end() - ctx.data()) as u64;
 
-    let src_lo = u32::from_be_bytes([
-        (*ip6).source_address[12], (*ip6).source_address[13],
-        (*ip6).source_address[14], (*ip6).source_address[15],
-    ]);
-    let dst_lo = u32::from_be_bytes([
-        (*ip6).destination_address[12], (*ip6).destination_address[13],
-        (*ip6).destination_address[14], (*ip6).destination_address[15],
-    ]);
+    let src_ip  = (*ip6).source_address;
+    let dst_ip  = (*ip6).destination_address;
 
     match next {
         PROTO_TCP | PROTO_UDP => handle_transport_v4(ctx, &TransportArgs {
-            xport_off: xport, protocol: next, src_ip: src_lo, dst_ip: dst_lo, pkt_len
+            xport_off: xport, protocol: next, src_ip, dst_ip, pkt_len
         }),
         PROTO_ICMP6 => {
             let icmp: *const IcmpHeader = ptr_at(ctx, xport)?;
-            let key = make_flow_key(src_lo, dst_lo, (*icmp).icmp_type as u16,
+            let key = make_flow_key(src_ip, dst_ip, (*icmp).icmp_type as u16,
                 (*icmp).code as u16, PROTO_ICMP6);
             update_metrics(&key, pkt_len, 0);
             Ok(xdp_action::XDP_PASS)
